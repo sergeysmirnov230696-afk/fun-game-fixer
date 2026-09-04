@@ -14,6 +14,7 @@ import { Route as AddressesRouteImport } from './routes/addresses'
 import { Route as DepositRouteImport } from './routes/deposit'
 import { Route as ReferralsRouteImport } from './routes/referrals'
 import { Route as WithdrawRouteImport } from './routes/withdraw'
+import { Route as ApiPublicPaykassaRouteImport } from './routes/api/public/paykassa'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +41,11 @@ const WithdrawRoute = WithdrawRouteImport.update({
   path: '/withdraw',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicPaykassaRoute = ApiPublicPaykassaRouteImport.update({
+  id: '/api/public/paykassa',
+  path: '/api/public/paykassa',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/deposit': typeof DepositRoute
   '/referrals': typeof ReferralsRoute
   '/withdraw': typeof WithdrawRoute
+  '/api/public/paykassa': typeof ApiPublicPaykassaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/deposit': typeof DepositRoute
   '/referrals': typeof ReferralsRoute
   '/withdraw': typeof WithdrawRoute
+  '/api/public/paykassa': typeof ApiPublicPaykassaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,13 +70,33 @@ export interface FileRoutesById {
   '/deposit': typeof DepositRoute
   '/referrals': typeof ReferralsRoute
   '/withdraw': typeof WithdrawRoute
+  '/api/public/paykassa': typeof ApiPublicPaykassaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/addresses' | '/deposit' | '/referrals' | '/withdraw'
+  fullPaths:
+    | '/'
+    | '/addresses'
+    | '/deposit'
+    | '/referrals'
+    | '/withdraw'
+    | '/api/public/paykassa'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/addresses' | '/deposit' | '/referrals' | '/withdraw'
-  id: '__root__' | '/' | '/addresses' | '/deposit' | '/referrals' | '/withdraw'
+  to:
+    | '/'
+    | '/addresses'
+    | '/deposit'
+    | '/referrals'
+    | '/withdraw'
+    | '/api/public/paykassa'
+  id:
+    | '__root__'
+    | '/'
+    | '/addresses'
+    | '/deposit'
+    | '/referrals'
+    | '/withdraw'
+    | '/api/public/paykassa'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -77,6 +105,7 @@ export interface RootRouteChildren {
   DepositRoute: typeof DepositRoute
   ReferralsRoute: typeof ReferralsRoute
   WithdrawRoute: typeof WithdrawRoute
+  ApiPublicPaykassaRoute: typeof ApiPublicPaykassaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -116,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WithdrawRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/paykassa': {
+      id: '/api/public/paykassa'
+      path: '/api/public/paykassa'
+      fullPath: '/api/public/paykassa'
+      preLoaderRoute: typeof ApiPublicPaykassaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -125,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   DepositRoute: DepositRoute,
   ReferralsRoute: ReferralsRoute,
   WithdrawRoute: WithdrawRoute,
+  ApiPublicPaykassaRoute: ApiPublicPaykassaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
