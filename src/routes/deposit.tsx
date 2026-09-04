@@ -4,7 +4,15 @@ import { toast } from "sonner";
 import { Shell } from "@/components/game/Shell";
 import { Coin } from "@/components/game/Coin";
 import { CurrencyIcon } from "@/components/game/CurrencyIcon";
-import { CURRENCIES, MIN_AMOUNT, fmt, fmtDate, requestDeposit, useGame } from "@/lib/game";
+import {
+  CURRENCIES,
+  MIN_AMOUNT,
+  fmt,
+  fmtDate,
+  requestDeposit,
+  useGame,
+  type DepositInvoice,
+} from "@/lib/game";
 import { haptic } from "@/lib/telegram";
 
 export const Route = createFileRoute("/deposit")({
