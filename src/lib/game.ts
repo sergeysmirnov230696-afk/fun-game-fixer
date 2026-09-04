@@ -70,14 +70,18 @@ export type GameState = {
   collected: number;
   dragons: OwnedDragon[];
   lastAccrual: number;
+  /** доход, накопленный по данным сервера на момент последней синхронизации */
+  pendingBase: number;
   txs: Tx[];
   referrals: Referral[];
   referralBalance: number;
   addresses: Partial<Record<CurrencyCode, string>>;
   refCode: string;
+  synced: boolean;
 };
 
 const KEY = "dragonvault_state_v1";
+const PLAYER_KEY = "dragonvault_player_key";
 
 function makeInitial(): GameState {
   const tg = getTelegramUser();
@@ -91,16 +95,19 @@ function makeInitial(): GameState {
     collected: 0,
     dragons: [],
     lastAccrual: Date.now(),
+    pendingBase: 0,
     txs: [],
     referrals: [],
     referralBalance: 0,
     addresses: {},
-    refCode: tg ? String(tg.id) : Math.random().toString(36).slice(2, 10),
+    refCode: tg ? `tg_${tg.id}` : "",
+    synced: false,
   };
 }
 
 let state: GameState = makeInitial();
 let hydrated = false;
+let playerKey = "";
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -115,6 +122,69 @@ function persist() {
   }
 }
 
+const STATUS: Record<string, Tx["status"]> = {
+  pending: "Ожидание",
+  done: "Выполнено",
+  rejected: "Отклонено",
+};
+
+function fromSnapshot(snap: PlayerSnapshot): GameState {
+  return {
+    ...state,
+    playerName: snap.name,
+    balance: snap.balance,
+    collected: snap.collected,
+    dragons: snap.dragons.map((d) => ({
+      dragonId: d.dragonId,
+      boughtAt: new Date(d.boughtAt).getTime(),
+    })),
+    lastAccrual: Date.now(),
+    pendingBase: snap.pending,
+    txs: snap.transactions.map((t) => ({
+      id: t.id,
+      date: new Date(t.createdAt).getTime(),
+      method: t.method,
+      sum: t.amount,
+      status: STATUS[t.status] ?? "Ожидание",
+      kind: t.kind,
+    })),
+    referrals: snap.referrals.map((r) => ({
+      date: new Date(r.createdAt).getTime(),
+      user: r.invitedName,
+      deposit: r.deposit,
+      income: r.income,
+    })),
+    referralBalance: snap.referralBalance,
+    addresses: snap.addresses as Partial<Record<CurrencyCode, string>>,
+    refCode: snap.playerKey,
+    synced: true,
+  };
+}
+
+function applySnapshot(snap: PlayerSnapshot) {
+  state = fromSnapshot(snap);
+  persist();
+  emit();
+}
+
+/** Выполняет серверное действие и обновляет состояние ответом сервера. */
+async function sync<T>(run: () => Promise<T>): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const snap = (await run()) as PlayerSnapshot;
+    applySnapshot(snap);
+    return { ok: true };
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "";
+    const map: Record<string, string> = {
+      INSUFFICIENT_FUNDS: "Недостаточно средств",
+      NOTHING_TO_COLLECT: "Пока нечего собирать",
+      NO_ADDRESS: "Укажите адрес для выплаты",
+    };
+    const known = Object.keys(map).find((k) => raw.includes(k));
+    return { ok: false, error: known ? map[known] : "Не удалось выполнить действие" };
+  }
+}
+
 export function hydrate() {
   if (hydrated || typeof window === "undefined") return;
   hydrated = true;
@@ -122,23 +192,33 @@ export function hydrate() {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as GameState;
-      if (parsed && parsed.version === 1) state = { ...makeInitial(), ...parsed };
+      if (parsed && parsed.version === 1) state = { ...makeInitial(), ...parsed, synced: false };
     }
   } catch {
     /* noop */
   }
+
   const tg = getTelegramUser();
-  if (tg) {
-    state.playerName =
-      [tg.first_name, tg.last_name].filter(Boolean).join(" ") || tg.username || state.playerName;
-    state.refCode = String(tg.id);
+  let key = tg ? `tg_${tg.id}` : localStorage.getItem(PLAYER_KEY);
+  if (!key) {
+    key = `web_${crypto.randomUUID().slice(0, 12)}`;
   }
-  const start = getStartParam();
-  if (start && start !== state.refCode) {
-    // приглашённый пользователь: бонус приглашающего эмулируется на его стороне
-  }
-  persist();
+  localStorage.setItem(PLAYER_KEY, key);
+  playerKey = key;
+
+  const name = tg
+    ? [tg.first_name, tg.last_name].filter(Boolean).join(" ") || tg.username || "Игрок"
+    : "Гость";
+  state.playerName = name;
+  state.refCode = key;
   emit();
+
+  const referredBy = getStartParam() ?? undefined;
+  void sync(() =>
+    loadPlayer({
+      data: { playerKey: key, name, ...(referredBy && referredBy !== key ? { referredBy } : {}) },
+    }),
+  );
 }
 
 function set(updater: (s: GameState) => GameState) {
@@ -146,6 +226,7 @@ function set(updater: (s: GameState) => GameState) {
   persist();
   emit();
 }
+
 
 export function subscribe(l: () => void) {
   listeners.add(l);
