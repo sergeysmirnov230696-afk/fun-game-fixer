@@ -280,6 +280,17 @@ export const collectReferral = createServerFn({ method: "POST" })
     return snapshot(data.playerKey);
   });
 
+export type DepositPayment = {
+  invoice: string;
+  orderId: string;
+  address: string;
+  tag: string;
+  tagName: string;
+  isTag: boolean;
+  system: string;
+  currency: string;
+};
+
 export const createDeposit = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     keySchema
@@ -294,13 +305,42 @@ export const createDeposit = createServerFn({ method: "POST" })
       .eq("player_key", data.playerKey)
       .maybeSingle();
     if (!player) throw new Error("Player not found");
+
+    const { PAYKASSA_MAP, createAddress } = await import("./paykassa.server");
+    const mapped = PAYKASSA_MAP[data.method];
+    if (!mapped) throw new Error("UNSUPPORTED_METHOD");
+
+    const orderId = `${data.playerKey}-${Date.now()}`;
+    const order = await createAddress({
+      system: mapped.system,
+      currency: mapped.currency,
+      orderId,
+      comment: `DragonVault deposit ${data.playerKey}`,
+      amount: data.amount,
+    });
+
     await db.from("transactions").insert({
       player_id: player.id as string,
       kind: "deposit",
       method: data.method,
       amount: data.amount,
+      order_id: orderId,
+      invoice: String(order.invoice),
+      pay_address: order.wallet,
+      tag: order.is_tag ? String(order.tag ?? "") : null,
     });
-    return snapshot(data.playerKey);
+
+    const payment: DepositPayment = {
+      invoice: String(order.invoice),
+      orderId,
+      address: order.wallet,
+      tag: order.is_tag ? String(order.tag ?? "") : "",
+      tagName: order.tag_name ?? "",
+      isTag: order.is_tag,
+      system: order.system,
+      currency: order.currency,
+    };
+    return { snapshot: await snapshot(data.playerKey), payment };
   });
 
 export const createWithdraw = createServerFn({ method: "POST" })
