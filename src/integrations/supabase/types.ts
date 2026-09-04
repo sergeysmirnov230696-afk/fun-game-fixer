@@ -131,6 +131,7 @@ export type Database = {
           kind: string
           method: string
           order_id: string | null
+          pay_address: string | null
           player_id: string
           status: string
           system: string | null
@@ -147,6 +148,7 @@ export type Database = {
           kind: string
           method: string
           order_id?: string | null
+          pay_address?: string | null
           player_id: string
           status?: string
           system?: string | null
@@ -163,6 +165,7 @@ export type Database = {
           kind?: string
           method?: string
           order_id?: string | null
+          pay_address?: string | null
           player_id?: string
           status?: string
           system?: string | null

@@ -4,7 +4,15 @@ import { toast } from "sonner";
 import { Shell } from "@/components/game/Shell";
 import { Coin } from "@/components/game/Coin";
 import { CurrencyIcon } from "@/components/game/CurrencyIcon";
-import { CURRENCIES, MIN_AMOUNT, fmt, fmtDate, requestDeposit, useGame } from "@/lib/game";
+import {
+  CURRENCIES,
+  MIN_AMOUNT,
+  fmt,
+  fmtDate,
+  requestDeposit,
+  useGame,
+  type DepositInvoice,
+} from "@/lib/game";
 import { haptic } from "@/lib/telegram";
 
 export const Route = createFileRoute("/deposit")({
@@ -29,8 +37,11 @@ function DepositPage() {
   const game = useGame();
   const [selected, setSelected] = useState<(typeof CURRENCIES)[number] | null>(null);
   const [amount, setAmount] = useState("1.00");
+  const [invoice, setInvoice] = useState<DepositInvoice | null>(null);
+  const [loading, setLoading] = useState(false);
   const deposits = game.txs.filter((t) => t.kind === "deposit");
   const usd = Number(amount) || 0;
+  const cryptoAmount = selected ? (usd * selected.rate).toFixed(6) : "0";
 
   if (!selected) {
     return (
@@ -55,6 +66,63 @@ function DepositPage() {
             </button>
           ))}
         </div>
+      </Shell>
+    );
+  }
+
+  if (invoice) {
+    const qrData = encodeURIComponent(invoice.address);
+    return (
+      <Shell>
+        <button
+          onClick={() => {
+            setInvoice(null);
+            setSelected(null);
+          }}
+          className="self-start text-sm text-muted-foreground"
+        >
+          ← Все монеты
+        </button>
+        <section className="panel space-y-4 px-4 py-5 text-center">
+          <p className="text-sm text-muted-foreground">
+            Отправьте{" "}
+            <span className="font-semibold text-foreground">
+              {cryptoAmount} {invoice.currency}
+            </span>{" "}
+            в сети {invoice.system} на адрес:
+          </p>
+          <p className="break-all rounded-lg bg-secondary px-3 py-2 font-mono text-xs">
+            {invoice.address}
+          </p>
+          {invoice.isTag && invoice.tag ? (
+            <p className="text-sm">
+              {invoice.tagName || "Memo"}:{" "}
+              <span className="font-mono font-semibold">{invoice.tag}</span>
+            </p>
+          ) : null}
+          <img
+            className="mx-auto rounded-lg bg-white p-2"
+            width={220}
+            height={220}
+            alt={`QR-код адреса ${invoice.currency}`}
+            src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${qrData}`}
+          />
+          <button
+            className="btn-gold mx-auto block w-2/3 py-3"
+            onClick={() => {
+              void navigator.clipboard?.writeText(invoice.address);
+              haptic();
+              toast.success("Адрес скопирован");
+            }}
+          >
+            Скопировать адрес
+          </button>
+          <p className="text-xs text-muted-foreground">
+            Баланс пополнится автоматически после подтверждения сети. Инвойс #{invoice.invoice}
+          </p>
+        </section>
+
+        <TxTable rows={deposits.map((t) => [fmtDate(t.date), t.method, fmt(t.sum), t.status])} />
       </Shell>
     );
   }
@@ -85,22 +153,29 @@ function DepositPage() {
           <label className="mb-1.5 block text-sm text-muted-foreground">{selected.label}</label>
           <div className="flex items-center gap-3">
             <CurrencyIcon label={selected.label} color={selected.color} size={32} />
-            <input className="field text-lg" readOnly value={(usd * selected.rate).toFixed(6)} />
+            <input className="field text-lg" readOnly value={cryptoAmount} />
           </div>
         </div>
         <button
-          className="btn-gold ml-auto block w-1/2 py-3"
-          onClick={() => {
+          className="btn-gold ml-auto block w-1/2 py-3 disabled:opacity-60"
+          disabled={loading}
+          onClick={async () => {
             if (usd < MIN_AMOUNT) {
               toast.error(`Минимальная сумма ${fmt(MIN_AMOUNT)}`);
               return;
             }
-            requestDeposit(selected.label, usd);
+            setLoading(true);
+            const res = await requestDeposit(selected.code, usd);
+            setLoading(false);
+            if (!res.ok || !res.invoice) {
+              toast.error(res.error ?? "Не удалось создать заявку");
+              return;
+            }
             haptic();
-            toast.success("Заявка создана. Ожидайте подтверждения сети.");
+            setInvoice(res.invoice);
           }}
         >
-          Пополнить
+          {loading ? "Создание…" : "Пополнить"}
         </button>
       </section>
 

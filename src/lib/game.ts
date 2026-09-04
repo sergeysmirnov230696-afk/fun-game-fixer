@@ -337,18 +337,43 @@ export function collectReferral(): number {
   return amount;
 }
 
-export function requestDeposit(currency: string, usd: number) {
-  const tx: Tx = {
-    id: Math.random().toString(36).slice(2),
-    date: Date.now(),
-    method: currency,
-    sum: usd,
-    status: "Ожидание",
-    kind: "deposit",
-  };
-  set((s) => ({ ...s, txs: [tx, ...s.txs] }));
-  report(sync(() => createDepositFn({ data: { playerKey, method: currency, amount: usd } })));
-  return tx;
+export type DepositInvoice = {
+  invoice: string;
+  address: string;
+  tag: string;
+  tagName: string;
+  isTag: boolean;
+  system: string;
+  currency: string;
+};
+
+export async function requestDeposit(
+  currency: CurrencyCode,
+  usd: number,
+): Promise<{ ok: boolean; invoice?: DepositInvoice; error?: string }> {
+  try {
+    const { snapshot, payment } = await createDepositFn({
+      data: { playerKey, method: currency, amount: usd },
+    });
+    applySnapshot(snapshot);
+    return {
+      ok: true,
+      invoice: {
+        invoice: payment.invoice,
+        address: payment.address,
+        tag: payment.tag,
+        tagName: payment.tagName,
+        isTag: payment.isTag,
+        system: payment.system,
+        currency: payment.currency,
+      },
+    };
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : "";
+    if (raw.includes("PAYKASSA_NOT_CONFIGURED"))
+      return { ok: false, error: "Платёжная система не настроена" };
+    return { ok: false, error: "Не удалось создать заявку. Попробуйте позже." };
+  }
 }
 
 export function requestWithdraw(
