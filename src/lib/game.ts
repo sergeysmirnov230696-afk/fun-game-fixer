@@ -192,7 +192,7 @@ async function sync<T>(run: () => Promise<T>): Promise<{ ok: boolean; error?: st
       NO_ADDRESS: "Укажите адрес для выплаты",
     };
     const known = Object.keys(map).find((k) => raw.includes(k));
-    return { ok: false, error: known ? map[known] : "Не удалось выполнить действие" };
+    return { ok: false, error: (known && map[known]) || "Не удалось выполнить действие" };
   }
 }
 
