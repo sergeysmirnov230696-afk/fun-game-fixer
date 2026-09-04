@@ -10,6 +10,17 @@ import dragon8 from "@/assets/dragon-8.png";
 import dragon9 from "@/assets/dragon-9.png";
 import dragon10 from "@/assets/dragon-10.png";
 import { getTelegramUser, getStartParam } from "./telegram";
+import { toast } from "sonner";
+import {
+  loadPlayer,
+  buyDragon as buyDragonFn,
+  collectIncome as collectIncomeFn,
+  collectReferral as collectReferralFn,
+  createDeposit as createDepositFn,
+  createWithdraw as createWithdrawFn,
+  savePayoutAddress as savePayoutAddressFn,
+  type PlayerSnapshot,
+} from "./game.functions";
 
 export type Dragon = {
   id: number;
