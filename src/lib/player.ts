@@ -87,8 +87,8 @@ export function useGameActions(playerKey?: string) {
     buy: useSnapshotMutation((dragonId: number) => buy({ data: { playerKey: key, dragonId } })),
     collect: useSnapshotMutation(() => collect({ data: { playerKey: key } })),
     collectReferral: useSnapshotMutation(() => collectRef({ data: { playerKey: key } })),
-    deposit: useSnapshotMutation((v: { method: string; amount: number }) =>
-      deposit({ data: { playerKey: key, ...v } }),
+    deposit: useSnapshotMutation(async (v: { method: string; amount: number }) =>
+      (await deposit({ data: { playerKey: key, ...v } })).snapshot,
     ),
     withdraw: useSnapshotMutation((v: { method: string; amount: number }) =>
       withdraw({ data: { playerKey: key, ...v } }),
