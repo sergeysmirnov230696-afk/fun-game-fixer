@@ -268,7 +268,7 @@ export function incomePerSecond(s: GameState, now = Date.now()) {
 
 /** накопленное, но не собранное */
 export function pendingIncome(s: GameState, now = Date.now()) {
-  let total = 0;
+  let total = s.pendingBase;
   for (const o of s.dragons) {
     const d = dragonById(o.dragonId);
     const end = o.boughtAt + d.lifespanDays * 86400000;
@@ -281,6 +281,12 @@ export function pendingIncome(s: GameState, now = Date.now()) {
 
 /* ---------- actions ---------- */
 
+function report(result: Promise<{ ok: boolean; error?: string }>) {
+  void result.then((r) => {
+    if (!r.ok && r.error) toast.error(r.error);
+  });
+}
+
 export function buyDragon(dragonId: number): { ok: boolean; error?: string } {
   const d = dragonById(dragonId);
   if (state.balance < d.price) return { ok: false, error: "Недостаточно средств" };
@@ -289,6 +295,7 @@ export function buyDragon(dragonId: number): { ok: boolean; error?: string } {
     balance: +(s.balance - d.price).toFixed(6),
     dragons: [...s.dragons, { dragonId, boughtAt: Date.now() }],
   }));
+  report(sync(() => buyDragonFn({ data: { playerKey, dragonId } })));
   return { ok: true };
 }
 
@@ -301,7 +308,9 @@ export function collect(): number {
     balance: +(s.balance + amount).toFixed(6),
     collected: +(s.collected + amount).toFixed(6),
     lastAccrual: now,
+    pendingBase: 0,
   }));
+  report(sync(() => collectIncomeFn({ data: { playerKey } })));
   return amount;
 }
 
@@ -313,6 +322,7 @@ export function collectReferral(): number {
     balance: +(s.balance + amount).toFixed(6),
     referralBalance: 0,
   }));
+  report(sync(() => collectReferralFn({ data: { playerKey } })));
   return amount;
 }
 
@@ -326,6 +336,7 @@ export function requestDeposit(currency: string, usd: number) {
     kind: "deposit",
   };
   set((s) => ({ ...s, txs: [tx, ...s.txs] }));
+  report(sync(() => createDepositFn({ data: { playerKey, method: currency, amount: usd } })));
   return tx;
 }
 
@@ -345,12 +356,15 @@ export function requestWithdraw(
     kind: "withdraw",
   };
   set((s) => ({ ...s, balance: +(s.balance - usd).toFixed(6), txs: [tx, ...s.txs] }));
+  report(sync(() => createWithdrawFn({ data: { playerKey, method: currency, amount: usd } })));
   return { ok: true };
 }
 
 export function saveAddress(currency: CurrencyCode, address: string) {
   set((s) => ({ ...s, addresses: { ...s.addresses, [currency]: address } }));
+  report(sync(() => savePayoutAddressFn({ data: { playerKey, method: currency, address } })));
 }
+
 
 export function referralLink(s: GameState) {
   return `https://t.me/DragonHash_bot?startapp=${s.refCode}`;
